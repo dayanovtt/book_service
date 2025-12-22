@@ -1,18 +1,18 @@
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, DeclarativeBase
+from app.config.settings import settings
 
-DATABASE_URL = "postgresql+psycopg2://timurdayanov@localhost:5432/book_service"
 
 class Base(DeclarativeBase):
     pass
 
 engine = create_engine(
-    DATABASE_URL,
+    settings.database_url,
     echo=True,
 )
 
 SessionLocal = sessionmaker(
+    bind=engine,
     autocommit=False,
     autoflush=False,
-    bind=engine
 )

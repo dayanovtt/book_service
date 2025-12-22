@@ -6,6 +6,7 @@ from app.db.session import Base
 
 from app.models.book import Book
 from app.models.outbox import Outbox
+from app.config.settings import settings
 
 
 Base.metadata.create_all(bind=engine)

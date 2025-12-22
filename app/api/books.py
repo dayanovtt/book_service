@@ -1,6 +1,9 @@
-from fastapi import APIRouter, status
+from fastapi import APIRouter, Depends
+from sqlalchemy.orm import Session
 
 from app.api.schemas import BookCreate
+from app.uow.uow import UnitOfWork
+from app.api.dependencies import get_session, get_book_service
 from app.services.book_service import BookService
 
 
@@ -9,15 +12,28 @@ router = APIRouter(
     tags=["books"],
 )
 
-@router.post("/", status_code=status.HTTP_201_CREATED)
-def add_book(payload: BookCreate):
-    service = BookService()
-    service.add_book(
-        title=payload.title,
-        author=payload.author,
-        price=payload.price,
-    )
+@router.post("/")
+def add_book(
+    data: BookCreate,
+    service: BookService = Depends(get_book_service),
+    session: Session = Depends(get_session),
+):
+    with UnitOfWork(session):
+        service.add_book(
+            title=data.title,
+            author=data.author,
+            price=data.price,
+        )
 
-@router.post("/{book_id}")
-def delete_book(book_id: int):
-    return {"message": f"delete book {book_id} - not implemented yet"}
+    return {"status": "ok"}
+
+@router.delete("/{book_id}")
+def delete_book(
+    book_id: int,
+    service: BookService = Depends(get_book_service),
+    session: Session = Depends(get_session),
+):
+    with UnitOfWork(session):
+        service.delete_book(book_id)
+
+    return {"status": "deleted"}

@@ -1,0 +1,35 @@
+{
+  "name": "book-outbox-connector",
+  "config": {
+    "connector.class": "io.debezium.connector.postgresql.PostgresConnector",
+    "tasks.max": "1",
+
+    "database.hostname": "postgres",
+    "database.port": "5432",
+    "database.user": "postgres",
+    "database.password": "postgres",
+    "database.dbname": "book_service",
+
+    "plugin.name": "pgoutput",
+    "slot.name": "book_service_outbox_slot",
+    "publication.autocreate.mode": "filtered",
+
+    "schema.include.list": "public",
+    "table.include.list": "public.outbox",
+
+    "topic.prefix": "dbz",
+
+    "transforms": "outbox",
+    "transforms.outbox.type": "io.debezium.transforms.outbox.EventRouter",
+
+    "transforms.outbox.table.field.event.id": "id",
+    "transforms.outbox.table.field.event.key": "id",
+    "transforms.outbox.table.field.event.payload": "payload",
+
+    "transforms.outbox.route.topic.replacement": "books.events",
+
+    "transforms.outbox.table.fields.additional.placement": "event_type:header:type",
+
+    "tombstones.on.delete": "false"
+  }
+}
