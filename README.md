@@ -76,8 +76,8 @@ REST API:
 ## Проверка Debezium
 ###### Ожидаемый статус - RUNNING
 ```bash
-     curl http://localhost:8083/connectors
-     curl http://localhost:8083/connectors/book-outbox-connector/status
+  curl http://localhost:8083/connectors
+  curl http://localhost:8083/connectors/book-outbox-connector/status
 ```
 
 ## Проверка Kafka
