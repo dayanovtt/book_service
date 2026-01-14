@@ -1,7 +1,5 @@
 from typing import Optional
-
 from sqlalchemy.orm import Session
-
 from app.models.book import Book
 
 
@@ -17,3 +15,6 @@ class BookRepository:
 
     def delete(self, book: Book) -> None:
         self.session.delete(book)
+
+    def list(self) -> list[Book]:
+        return self.session.query(Book).order_by(Book.id).all()

@@ -23,17 +23,22 @@ class BookService:
         )
 
         self.book_repo.add(book)
+        self.book_repo.session.flush()
+
+        snapshot = {
+            "id": book.id,
+            "title": book.title,
+            "author": book.author,
+            "price": float(book.price),
+        }
 
         event = Outbox(
             event_type="BookAdded",
-            payload={
-                "title": title,
-                "author": author,
-                "price": price,
-            },
+            payload=snapshot,
         )
 
         self.outbox_repo.add(event)
+
 
     def delete_book(self, book_id: int) -> None:
         book = self.book_repo.get_by_id(book_id)
@@ -59,3 +64,6 @@ class BookService:
         )
 
         self.outbox_repo.add(event)
+
+    def list_books(self):
+        return self.book_repo.list()

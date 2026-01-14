@@ -3,7 +3,8 @@ services:
     build: .
     container_name: book_service_app
     depends_on:
-      - postgres
+      postgres:
+        condition: service_healthy
     env_file:
       - .env
     ports:
@@ -14,14 +15,25 @@ services:
   postgres:
     image: postgres:16
     container_name: book_service_postgres
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}" ]
+      interval: 5s
+      timeout: 3s
+      retries: 20
     ports:
       - "5432:5432"
     environment:
       POSTGRES_DB: ${POSTGRES_DB}
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    command: >
+      postgres
+      -c wal_level=logical
+      -c max_replication_slots=10
+      -c max_wal_senders=10
     volumes:
       - postgres_data:/var/lib/postgresql/data
+
 
   zookeeper:
     image: confluentinc/cp-zookeeper:7.6.1
@@ -47,13 +59,41 @@ services:
       KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT_INTERNAL
 
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+    healthcheck:
+      test: [ "CMD-SHELL", "/usr/bin/kafka-topics --bootstrap-server kafka:29092 --list > /dev/null 2>&1" ]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+
+  init-kafka:
+    image: confluentinc/cp-kafka:7.6.1
+    container_name: book_service_init_kafka
+    depends_on:
+      kafka:
+        condition: service_healthy
+    entrypoint: ["/bin/bash", "-lc"]
+    command: >
+      bash -lc "echo 'Waiting for Kafka...';
+      for i in {1..60}; do
+        /usr/bin/kafka-topics --bootstrap-server kafka:29092 --list > /dev/null 2>&1 && break;
+        echo 'Kafka not ready yet...'; sleep 1;
+      done;
+      echo 'Creating topic books.events...';
+      /usr/bin/kafka-topics --bootstrap-server kafka:29092 --create --if-not-exists --topic books.events --partitions 1 --replication-factor 1;
+      echo 'Done.'"
+  
 
   connect:
     image: debezium/connect:2.7.0.Final
     container_name: book_service_connect
     depends_on:
-      - kafka
-      - postgres
+      kafka:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+      init-kafka:
+        condition: service_completed_successfully
     ports:
       - "8083:8083"
     env_file:
@@ -67,9 +107,64 @@ services:
       STATUS_STORAGE_TOPIC: connect_statuses
 
       KEY_CONVERTER: org.apache.kafka.connect.json.JsonConverter
-      VALUE_CONVERTER: org.apache.kafka.connect.json.JsonConverter
+      VALUE_CONVERTER: org.apache.kafka.connect.storage.StringConverter
       KEY_CONVERTER_SCHEMAS_ENABLE: "false"
       VALUE_CONVERTER_SCHEMAS_ENABLE: "false"
+
+      CONNECT_CONFIG_PROVIDERS: env
+      CONNECT_CONFIG_PROVIDERS_ENV_CLASS: org.apache.kafka.common.config.provider.EnvVarConfigProvider
+
+      postgres_host: ${POSTGRES_HOST}
+      postgres_port: ${POSTGRES_PORT}
+      postgres_user: ${POSTGRES_USER}
+      postgres_password: ${POSTGRES_PASSWORD}
+      postgres_db: ${POSTGRES_DB}
+
+
+  init-connect:
+    image: alpine:3.20
+    container_name: book_service_init_connect
+    depends_on:
+      connect:
+        condition: service_started
+    volumes:
+      - ./:/work:ro
+    working_dir: /work
+    command:
+      - sh
+      - -lc
+      - |
+        set -eu
+
+        apk add --no-cache curl
+
+        echo "Waiting for Kafka Connect..."
+        for i in $(seq 1 60); do
+          if curl -sf http://connect:8083/connectors >/dev/null; then
+            echo "Connect is ready"
+            break
+          fi
+          echo "Connect not ready yet..."
+          sleep 1
+        done
+
+        echo "Current connectors:"
+        curl -s http://connect:8083/connectors || true
+        echo
+
+        if curl -s http://connect:8083/connectors | grep -q '"book-outbox-connector"'; then
+          echo "Connector already exists."
+        else
+          echo "Creating connector..."
+          ls -la infra/cdc
+          curl -s -X POST http://connect:8083/connectors \
+            -H "Content-Type: application/json" \
+            --data @infra/cdc/debezium-connector.json
+          echo
+        fi
+
+        echo "Done."
+
 
 volumes:
   postgres_data:
