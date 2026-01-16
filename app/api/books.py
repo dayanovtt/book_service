@@ -5,6 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException, Response, status
 from app.api.dependencies import get_book_service
 from app.api.schemas import BookCreate, BookRead, ErrorResponse
 from app.services.book_service import BookService
+from app.api.responses import COMMON_ERROR_RESPONSES
 
 router = APIRouter(prefix="/books", tags=["books"])
 
@@ -13,16 +14,7 @@ router = APIRouter(prefix="/books", tags=["books"])
     "/",
     status_code=status.HTTP_201_CREATED,
     response_model=BookRead,
-    responses={
-        422: {
-            "model": ErrorResponse,
-            "description": "Validation error",
-        },
-        500: {
-            "model": ErrorResponse,
-            "description": "Internal server error",
-        },
-    },
+    responses=COMMON_ERROR_RESPONSES,
 )
 def add_book(
     data: BookCreate,
@@ -35,20 +27,7 @@ def add_book(
 @router.delete(
     "/{book_id}",
     status_code=status.HTTP_204_NO_CONTENT,
-    responses={
-        404: {
-            "model": ErrorResponse,
-            "description": "Book not found",
-        },
-        422: {
-            "model": ErrorResponse,
-            "description": "Validation error",
-        },
-        500: {
-            "model": ErrorResponse,
-            "description": "Internal server error",
-        },
-    },
+    responses=COMMON_ERROR_RESPONSES,
 )
 def delete_book(
     book_id: int,
@@ -63,12 +42,7 @@ def delete_book(
 @router.get(
     "/",
     response_model=List[BookRead],
-    responses={
-        500: {
-            "model": ErrorResponse,
-            "description": "Internal server error",
-        },
-    },
+    responses=COMMON_ERROR_RESPONSES,
 )
 def list_books(
     service: BookService = Depends(get_book_service),
