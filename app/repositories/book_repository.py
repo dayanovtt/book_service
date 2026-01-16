@@ -9,6 +9,7 @@ class BookRepository:
 
     def add(self, book: Book) -> None:
         self.session.add(book)
+        self.session.flush()
 
     def get_by_id(self, book_id: int) -> Optional[Book]:
         return self.session.get(Book, book_id)

@@ -1,15 +1,11 @@
 from fastapi import APIRouter, Depends
 from typing import List
 
+from app.api.dependencies import get_book_service
 from app.api.schemas import BookCreate, BookRead
 from app.services.book_service import BookService
-from app.api.dependencies import get_book_service
 
-
-router = APIRouter(
-    prefix="/books",
-    tags=["books"],
-)
+router = APIRouter(prefix="/books", tags=["books"])
 
 
 @router.post("/")
@@ -17,11 +13,7 @@ def add_book(
     data: BookCreate,
     service: BookService = Depends(get_book_service),
 ):
-    service.add_book(
-        title=data.title,
-        author=data.author,
-        price=data.price,
-    )
+    service.add_book(data.title, data.author, data.price)
     return {"status": "ok"}
 
 
@@ -30,8 +22,10 @@ def delete_book(
     book_id: int,
     service: BookService = Depends(get_book_service),
 ):
-    service.delete_book(book_id)
-    return {"status": "deleted"}
+    deleted = service.delete_book(book_id)
+    if deleted:
+        return {"status": "deleted"}
+    return {"status": "not_found"}
 
 
 @router.get("/", response_model=List[BookRead])
