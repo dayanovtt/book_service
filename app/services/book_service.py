@@ -7,10 +7,10 @@ class BookService:
     def __init__(self, uow: UnitOfWork):
         self.uow = uow
 
-    def add_book(self, title: str, author: str, price: float) -> None:
+    def add_book(self, title: str, author: str, price: float) -> Book:
         with self.uow as uow:
             book = Book(title=title, author=author, price=price)
-            uow.book_repo.add(book)  # flush внутри repo.add
+            uow.book_repo.add(book)  # flush + refresh внутри repo.add
 
             snapshot = {
                 "id": book.id,
@@ -22,6 +22,8 @@ class BookService:
             uow.outbox_repo.add(
                 Outbox(event_type="BookAdded", payload=snapshot)
             )
+
+            return book
 
     def delete_book(self, book_id: int) -> bool:
         with self.uow as uow:
@@ -42,6 +44,6 @@ class BookService:
             )
             return True
 
-    def list_books(self):
+    def list_books(self) -> list[Book]:
         with self.uow as uow:
             return uow.book_repo.list()
